@@ -1,0 +1,16 @@
+build*/
+GeneratedFiles/
+debug/
+release/
+*.pro.user*
+*.o
+*.obj
+*.exe
+__pycache__/
+.env
+.env.*
+login.txt
+pass.txt
+*session*
+*.db
+*.sqlite*
