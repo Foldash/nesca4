@@ -6,11 +6,11 @@
 
 ## Скачать для Windows
 
-[**Скачать NESCA4-UI-Windows-x64.zip**](https://github.com/Foldash/nesca4/releases/download/ui-preview-4/NESCA4-UI-Windows-x64.zip)
+[**Скачать NESCA4-UI-Windows-x64.zip**](https://github.com/Foldash/nesca4/releases/download/ui-preview-5/NESCA4-UI-Windows-x64.zip)
 
 Распакуй весь архив, открой папку `NESCA4-UI-Windows-x64` и запусти `nesca4-ui.exe`. Устанавливать Qt или компилятор не нужно: DLL включены в архив. EXE нужно оставлять рядом с ними и папкой `platforms`.
 
-Это предпросмотр интерфейса с отключёнными сетевыми действиями. [Страница релиза, контрольная сумма и снимок Windows](https://github.com/Foldash/nesca4/releases/tag/ui-preview-4).
+Это предпросмотр интерфейса с отключёнными сетевыми действиями. [Страница релиза, контрольная сумма и снимок Windows](https://github.com/Foldash/nesca4/releases/tag/ui-preview-5).
 
 ## Текущее состояние
 
@@ -70,7 +70,7 @@ ctest --test-dir build-engine --output-on-failure
 
 Цель `nesca4-legacy` пока предназначена для инженерной проверки: парсеры ответов и файлов, общие данные GUI, TLS и обработка секретов требуют дальнейшего аудита. Windows ZIP выше остаётся автономным предпросмотром UI.
 
-На предыдущем этапе проверки GitHub Actions прошли: Linux engineering build — 7/7 на GCC 13.3, Windows preview/runtime — 5/5 на MSVC 19.44. Новые проверки импорта добавлены в оба workflow. Windows-пакет прошёл проверку запуска после распаковки без Qt в PATH.
+Проверки GitHub Actions успешны: Linux engineering build — 9/9 на GCC 13.3, Windows preview/runtime/разборщик — 6/6 на MSVC 19.44. Windows-пакет прошёл проверку запуска после распаковки без Qt в PATH.
 
 ## Проверка файла диапазонов
 
