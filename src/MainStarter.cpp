@@ -1,7 +1,7 @@
 #include "MainStarter.h"
 
 int gTimeOut = 3;
-int gPingTimeout = 1;
+std::atomic<int> gPingTimeout{1};
 int gMode;
 int PieCamerasC1 = 0, PieBA = 0, PieOther = 0, PieSSH = 0;
 std::atomic<int> camerasC1(0), filtered(0), Overl(0), Alive(0), saved(0), other(0), ssh(0);
@@ -10,7 +10,7 @@ int MaxPass = 0, MaxLogin = 0,
 MaxWFLogin = 0, MaxWFPass = 0,
 MaxFTPLogin = 0, MaxFTPPass = 0,
 MaxSSHPass = 0;
-int baCount = 0;
+std::atomic<int> baCount{0};
 int gMaxBrutingThreads = 50;
 unsigned int Activity = 0;
 char gTLD[128] = { 0 };
@@ -227,6 +227,7 @@ int MainStarter::fileLoader(const char *fileName) {
 	gTargetsNumber = gTargets;
 	stt->doEmitionYellowFoundData("List loader - [OK] (" + QString::number(gTargetsNumber + 1) + " hosts)");
 
+    return 0;
 }
 int MainStarter::loadTargets(const char *data) {
 
@@ -456,7 +457,7 @@ void MainStarter::saveBackupToFile()
 	//ZeroMemory(saveStr, sizeof(saveStr));
 	saveStr[0] = 0;
 
-	sprintf(saveStr, "[PING_TO]: %d\n", gPingTimeout);
+	sprintf(saveStr, "[PING_TO]: %d\n", gPingTimeout.load());
 	strcat(saveBuffer, saveStr);
 	//ZeroMemory(saveStr, sizeof(saveStr));
 	saveStr[0] = 0;
@@ -500,42 +501,11 @@ void MainStarter::saveBackupToFile()
 	saveBuffer[0] = 0;
 }
 
-bool saverRunning = false;
 void MainStarter::saveBK() {
-	while (savingBackUpFile) Sleep(400);
-	savingBackUpFile = true;
-	saveBackupToFile();
-	savingBackUpFile = false;
-}
-void MainStarter::saver()
-{
-	saverRunning = true;
-	Sleep(1000);
-	while (saveBackup && globalScanFlag)
-	{
-		saveBK();
-		Sleep(10000);
-	};
-	saverRunning = false;
-}
-
-bool ipPerSecTimer = false;
-void _IPPerSecTimer() {
-	ipPerSecTimer = true;
-	int ticks = 0;
-	int ovrlIPs = 0;
-	Sleep(50);
-
-	while (globalScanFlag)
-	{
-		ovrlIPs += ipCounter;
-		ipCounter = 0;
-
-		sprintf(metaIPS, "%f.5", ovrlIPs / ++ticks);
-
-		Sleep(1000);
-	}
-	ipPerSecTimer = false;
+    savingBackUpFile = true;
+    try { saveBackupToFile(); }
+    catch (...) { savingBackUpFile = false; throw; }
+    savingBackUpFile = false;
 }
 
 bool trackerRunning = false;
@@ -911,18 +881,20 @@ void verboseProgress(unsigned long target) {
 }
 
 void _connect(std::string ip) {
-	if (!globalScanFlag) return;
-
-	++ipCounter;
-	++cons;
-	Connector con;
-	for (int i = 0; i < MainStarter::portVector.size(); ++i)
-	{
-		if (!globalScanFlag) break;
-		if (con.connectToPort((char*)ip.c_str(), MainStarter::portVector[i]) == -2) break;
-	};
-	--cons;
-	stt->doEmitionUpdateArc(gTargets);
+    if (!globalScanFlag) return;
+    ++ipCounter;
+    {
+        struct ActiveConnection {
+            ActiveConnection() { ++cons; }
+            ~ActiveConnection() { --cons; }
+        } active;
+        Connector con;
+        for (const int port : MainStarter::portVector) {
+            if (!globalScanFlag) break;
+            if (con.connectToPort(const_cast<char *>(ip.c_str()), port) == -2) break;
+        }
+    }
+    stt->doEmitionUpdateArc(gTargets);
 }
 
 void MainStarter::startIPScan(){
@@ -984,8 +956,6 @@ void MainStarter::startIPScan(){
 
 						   std::random_shuffle(ipVec.begin(), ipVec.end());
 						   while (ipVec.size() != 0) {
-
-							   while (cons >= gThreads && globalScanFlag) Sleep(500);
 							   if (!globalScanFlag) goto haters_gonna_hate_IPM;
 
 							   ++indexIP;
@@ -1006,8 +976,6 @@ void MainStarter::startIPScan(){
 
 						   std::random_shuffle(ipVec.begin(), ipVec.end());
 						   while (ipVec.size() != 0) {
-
-						   while (cons >= gThreads && globalScanFlag) Sleep(500);
 						   if (!globalScanFlag) goto haters_gonna_hate_IPM;
 
 						   ++indexIP;
@@ -1028,8 +996,6 @@ void MainStarter::startIPScan(){
 	case false: {
 					struct in_addr tAddr;
 					for (unsigned long i = ip1; i <= ip2; ++i) {
-
-						while (cons >= gThreads && globalScanFlag) Sleep(500);
 						if (!globalScanFlag) break;
 
 						++indexIP;
@@ -1119,7 +1085,6 @@ int _GetDNSFromMask(char *mask, char *saveMask, char *saveMaskEnder) {
 	else
 	{
 		strcpy(currentMask, saveMask);
-		while (cons >= gThreads && globalScanFlag) Sleep(300);
 		if (!globalScanFlag) return 0;
 
 		++indexIP;
@@ -1128,6 +1093,7 @@ int _GetDNSFromMask(char *mask, char *saveMask, char *saveMaskEnder) {
 
 		Threader::fireThread(currentIP, _connect);
 	};
+    return 0;
 }
 int _getChunkCount(char *data) {
 	int firstPos = _getPos(data[1]);
@@ -1297,7 +1263,6 @@ void MainStarter::startImportScan(){
 
 					   int ip = 0;
 					   while ((ip = ipRandomizer.getNext()) != 0) {
-						   while (cons >= gThreads && globalScanFlag) Sleep(500);
 						   if (!globalScanFlag) goto haters_gonna_hate_IM;
 
 						   ++indexIP;
@@ -1325,8 +1290,6 @@ void MainStarter::startImportScan(){
 				ipsendfl[gflIndex][3];
 			struct in_addr tAddr;
 			for (unsigned long i = ip1; i <= ip2; ++i) {
-
-				while (cons >= gThreads && globalScanFlag) Sleep(500);
 				if (!globalScanFlag) break;
 
 				++indexIP;
@@ -1342,25 +1305,10 @@ void MainStarter::startImportScan(){
 	}
 }
 
-void MainStarter::runAuxiliaryThreads() {
-
-	FileUpdater::loadOnce();
-	if (!FileUpdater::running) {
-		std::thread lpThread(FileUpdater::updateLists);
-		lpThread.detach();
-	}
-	//if (!trackerRunning) {
-	//	std::thread trackerThread(_tracker);
-	//	trackerThread.detach();
-	//}
-	if (!ipPerSecTimer) {
-		std::thread timerThread(_IPPerSecTimer);
-		timerThread.detach();
-	}
-	if (!saverRunning) {
-		std::thread saverThread(&MainStarter::saver, this);
-		saverThread.detach();
-	}
+void MainStarter::loadSessionData() {
+    // Freeze list data until the session has joined every worker. Periodic
+    // reload of the legacy char** arrays is unsafe and is no longer started.
+    FileUpdater::loadOnce();
 }
 
 void MainStarter::createResultFiles() {
@@ -1392,50 +1340,6 @@ void MainStarter::createResultFiles() {
 #endif
 }
 
-/* This array will store all of the mutexes available to OpenSSL. */
-static MUTEX_TYPE *mutex_buf = NULL;
-
-static void locking_function(int mode, int n, const char * file, int line)
-{
-	if (mode & CRYPTO_LOCK)
-		MUTEX_LOCK(mutex_buf[n]);
-	else
-		MUTEX_UNLOCK(mutex_buf[n]);
-}
-
-static unsigned long id_function(void)
-{
-	return ((unsigned long)THREAD_ID);
-}
-
-int thread_setup(void)
-{
-	int i;
-
-	mutex_buf = (MUTEX_TYPE*)malloc(CRYPTO_num_locks() * sizeof(MUTEX_TYPE));
-	if (!mutex_buf)
-		return 0;
-	for (i = 0; i < CRYPTO_num_locks(); i++)
-		MUTEX_SETUP(mutex_buf[i]);
-	CRYPTO_set_id_callback(id_function);
-	CRYPTO_set_locking_callback(locking_function);
-	return 1;
-}
-
-int thread_cleanup(void)
-{
-	int i;
-	if (!mutex_buf)
-		return 0;
-	CRYPTO_set_id_callback(NULL);
-	CRYPTO_set_locking_callback(NULL);
-	for (i = 0; i < CRYPTO_num_locks(); i++)
-		MUTEX_CLEANUP(mutex_buf[i]);
-	free(mutex_buf);
-	mutex_buf = NULL;
-	return 1;
-}
-
 void MainStarter::start(const char* targets, const char* ports) {
 	std::srand(std::time(NULL));
 
@@ -1448,7 +1352,6 @@ void MainStarter::start(const char* targets, const char* ports) {
 	saveBackup = true;
 	curl_global_init(CURL_GLOBAL_ALL);
 	
-	thread_setup();
 
 
 	QString fileSuffix = QString(targets);
@@ -1462,8 +1365,11 @@ void MainStarter::start(const char* targets, const char* ports) {
 		return;
 	}
 
+	if (QThread::currentThread()->isInterruptionRequested()) return;
 	globalScanFlag = true;
-	runAuxiliaryThreads();
+	loadSessionData();
+    if (!globalScanFlag) return;
+    Threader::start();
 
 	if (gMode == 0) startIPScan();
 	else if (gMode == 1) startDNSScan();
@@ -1471,11 +1377,14 @@ void MainStarter::start(const char* targets, const char* ports) {
 
 	stt->doEmitionYellowFoundData("Stopping threads...");
 
-	while (cons > 0 || jsonArr->size() > 0) Sleep(2000);
+	Threader::finish();
+    globalScanFlag = false;
+    const auto poolStats = Threader::stats();
+    if (poolStats.failed != 0)
+        stt->doEmitionRedFoundData("Ошибок в рабочих заданиях: " + QString::number(poolStats.failed));
 	MainStarter::saveBK();
 	saveBackup = false;
 	
-	thread_cleanup();
 
 	stt->doEmitionGreenFoundData("Done. Saved <u>" + QString::number(saved) + 
 		"</u> of <u>" + QString::number(found) + "</u> nodes.");

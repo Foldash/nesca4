@@ -58,23 +58,23 @@ std::string getLocation(const std::string *buff) {
 }
 
 void setNewIP(const char *ipOrig, char *ip, std::string *buff, int size) {
-	strncpy(ip, ipOrig, size);
-	const std::string &location = getLocation(buff);
-	if (location.size() > 0) {
-		if (Utils::ustrstr(location, "http") != -1) {
-			strncpy(ip, location.c_str(), size);
-		}
-		else {
-			int ipLength = (int)strstr(ipOrig + 8, "/");
-			if (0 != ipLength) {
-				strncpy(ip, ipOrig, ipLength);
-				strncat(ip, location.c_str(), size - ipLength);
-			}
-			else {
-				strncat(ip, location.c_str(), size);
-			}
-		}
-	}
+    if (ip == nullptr || size <= 0) return;
+    ip[0] = '\0';
+    if (ipOrig == nullptr || buff == nullptr) return;
+    const std::size_t capacity = static_cast<std::size_t>(size);
+    std::string result(ipOrig);
+    const std::string location = getLocation(buff);
+    if (!location.empty()) {
+        if (Utils::ustrstr(location, "http") != -1) result = location;
+        else {
+            const std::size_t offset = std::min<std::size_t>(result.size(), 8);
+            const std::size_t path = result.find('/', offset);
+            result = result.substr(0, path) + location;
+        }
+    }
+    const std::size_t length = std::min(result.size(), capacity - 1);
+    std::memcpy(ip, result.data(), length);
+    ip[length] = '\0';
 }
 
 lopaStr BA::BABrute(const char *ipOrig, const int port, bool performDoubleCheck) {
@@ -169,10 +169,10 @@ lopaStr BA::BABrute(const char *ipOrig, const int port, bool performDoubleCheck)
 	char login[32] = { 0 };
 	char pass[32] = { 0 };
     for(int i = 0; i < MaxLogin; ++i) {
-		FileUpdater::cv.wait(FileUpdater::lk, [] {return FileUpdater::ready; });
+		FileUpdater::waitForReady();
 		strcpy(login, loginLst[i]);
         for (int j = 0; j < MaxPass; ++j) {
-            FileUpdater::cv.wait(FileUpdater::lk, []{return FileUpdater::ready;});
+            FileUpdater::waitForReady();
             if (!globalScanFlag) return lps;
 
 			strcpy(pass, passLst[j]);

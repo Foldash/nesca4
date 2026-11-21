@@ -25,14 +25,14 @@ lopaStr FTPA::FTPBrute(const char *ip, const int port, PathStr *ps) {
 	for (int i = 0; i < MaxFTPLogin; ++i)
     {
         if(!globalScanFlag) return lps;
-		FileUpdater::cv.wait(FileUpdater::lk, []{return FileUpdater::ready; });
+		FileUpdater::waitForReady();
 		strcpy(login, ftpLoginLst[i]);
 		if (strlen(login) <= 1) continue;
 
 		for (int j = 0; j < MaxFTPPass; ++j)
         {
             if(!globalScanFlag) return lps;
-			FileUpdater::cv.wait(FileUpdater::lk, []{return FileUpdater::ready; });
+			FileUpdater::waitForReady();
 			strcpy(pass, ftpPassLst[j]);
 			if (strlen(pass) <= 1) continue;
 

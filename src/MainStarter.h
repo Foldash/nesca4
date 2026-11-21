@@ -59,8 +59,9 @@ public:
 		ipsend[0] = 0;
 	}
 	~MainStarter(){
-		FileUpdater::FUClear();
+		globalScanFlag = false;
 		Threader::cleanUp();
+		FileUpdater::FUClear();
 		curl_global_cleanup();
 
 		while (savingBackUpFile) Sleep(100);
@@ -125,8 +126,7 @@ public:
 	}
 
 	void unBlockButtons();
-	void runAuxiliaryThreads();
-	void saver();
+	void loadSessionData();
 	int fileLoader(const char *fileName);
 	static void createResultFiles();
 	void start(const char* targets, const char* ports);

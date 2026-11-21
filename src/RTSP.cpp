@@ -47,10 +47,10 @@ lopaStr RTSP::RTSPBrute(const char *ip, const int port) {
 	char login[32] = { 0 };
 	char pass[32] = { 0 };
 	for (int i = 0; i < MaxLogin; ++i) {
-		FileUpdater::cv.wait(FileUpdater::lk, [] {return FileUpdater::ready; });
+		FileUpdater::waitForReady();
 		strcpy(login, loginLst[i]);
 		for (int j = 0; j < MaxPass; ++j) {
-			FileUpdater::cv.wait(FileUpdater::lk, [] {return FileUpdater::ready; });
+			FileUpdater::waitForReady();
 			if (!globalScanFlag) return lps;
 			strcpy(pass, passLst[j]);
 

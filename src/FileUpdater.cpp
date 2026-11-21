@@ -22,7 +22,6 @@ int FileUpdater::gNegativeSize = 0;
 std::mutex FileUpdater::filesUpdatingMutex;
 std::condition_variable FileUpdater::cv;
 bool FileUpdater::ready = false;
-std::unique_lock<std::mutex> FileUpdater::lk;
 std::vector<std::string> FileUpdater::negativeVector;
 
 void negativeLoader() {
@@ -393,42 +392,43 @@ long getFileSize(const char *fileName) {
     return in.tellg();
 }
 
-void updateList(const char *fileName, long *szPtr, void *funcPtr(void)) {
+void updateList(const char *fileName, long *szPtr, void (*funcPtr)()) {
 	if (!globalScanFlag) return;
     long sz = getFileSize(fileName);
 
     if(sz != *szPtr) {
-        FileUpdater::lk = std::unique_lock<std::mutex> (FileUpdater::filesUpdatingMutex);
+        std::unique_lock<std::mutex> lock(FileUpdater::filesUpdatingMutex);
         funcPtr();
         *szPtr = sz;
-        FileUpdater::lk.unlock();
         FileUpdater::ready = true;
         FileUpdater::cv.notify_one();
     }
 }
 
-void FileUpdater::updateLists() {
-	running = true;
-    while(globalScanFlag) {
-        Sleep(30000);
-        if(!globalScanFlag) break;
-        loadOnce();
-    }
-	running = false;
+void FileUpdater::waitForReady() {
+    std::unique_lock<std::mutex> lock(filesUpdatingMutex);
+    cv.wait(lock, [] { return ready; });
 }
 
 void FileUpdater::loadOnce() {
-	updateList(NEGATIVE_FN, &oldNegLstSize, (void*(*)(void))updateNegatives);
-	updateList(LOGIN_FN, &oldLoginLstSize, (void*(*)(void))updateLogin);
-	updateList(PASS_FN, &oldPassLstSize, (void*(*)(void))updatePass);
-	updateList(SSH_PASS_FN, &oldSSHLstSize, (void*(*)(void))updateSSH);
-	updateList(WF_LOGIN_FN, &oldWFLoginLstSize, (void*(*)(void))updateWFLogin);
-	updateList(WF_PASS_FN, &oldWFPassLstSize, (void*(*)(void))updateWFPass);
-	updateList(FTP_LOGIN_FN, &oldFTPLoginLstSize, (void*(*)(void))updateFTPLogin);
-	updateList(FTP_PASS_FN, &oldFTPPassLstSize, (void*(*)(void))updateFTPPass);
+	updateList(NEGATIVE_FN, &oldNegLstSize, updateNegatives);
+	updateList(LOGIN_FN, &oldLoginLstSize, updateLogin);
+	updateList(PASS_FN, &oldPassLstSize, updatePass);
+	updateList(SSH_PASS_FN, &oldSSHLstSize, updateSSH);
+	updateList(WF_LOGIN_FN, &oldWFLoginLstSize, updateWFLogin);
+	updateList(WF_PASS_FN, &oldWFPassLstSize, updateWFPass);
+	updateList(FTP_LOGIN_FN, &oldFTPLoginLstSize, updateFTPLogin);
+	updateList(FTP_PASS_FN, &oldFTPPassLstSize, updateFTPPass);
+    {
+        std::lock_guard<std::mutex> lock(filesUpdatingMutex);
+        ready = true;
+    }
+    cv.notify_all();
 }
 
 void FileUpdater::FUClear() {
+    std::lock_guard<std::mutex> lock(filesUpdatingMutex);
+    ready = false;
     running = false;
     oldNegLstSize = 0;
     oldLoginLstSize = 0;

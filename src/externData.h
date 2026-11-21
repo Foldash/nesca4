@@ -28,7 +28,8 @@ extern char **loginLst, **passLst,
 **wfLoginLst, **wfPassLst,
 **ftpLoginLst, **ftpPassLst,
 **sshlpLst;
-extern bool trackerOK, globalScanFlag, MapWidgetOpened,
+extern std::atomic<bool> globalScanFlag;
+extern bool trackerOK, MapWidgetOpened,
     widgetIsHidden, gNegDebugMode,
     gDebugMode, horLineFlag, gPingNScan, gShuffle,
 	BALogSwitched;

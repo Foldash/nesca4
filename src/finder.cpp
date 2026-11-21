@@ -1,4 +1,4 @@
-﻿#include "HikvisionLogin.h"
+#include "HikvisionLogin.h"
 #include "STh.h"
 #include "mainResources.h"	
 #include "externFunctions.h"
@@ -249,7 +249,7 @@ bool isNegative(const std::string *buff, const char *ip, int port, const char *c
 	else codedStr = QString(buff->c_str());
 
 	for (auto negEntry : FileUpdater::negativeVector) {
-		FileUpdater::cv.wait(FileUpdater::lk, []{return FileUpdater::ready; });
+		FileUpdater::waitForReady();
 		if (!globalScanFlag) return true;
 
 		if (Utils::ustrstr(std::string(codedStr.toLocal8Bit().data()), negEntry) != -1) {
@@ -1413,6 +1413,7 @@ int _specRTSPBrute(const char *ip, int port,
 		_specFillerRSTP(ip, port, title, lps.login, lps.pass, flag);
 		//fillGlobalLogData(ip, port, std::to_string(size).c_str(), finalstr, lps.login, lps.pass, "", cp, "RTSP");
 	};
+    return 0;
 }
 
 const char *GetTitle(const char* str)

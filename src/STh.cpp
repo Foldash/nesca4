@@ -82,10 +82,16 @@ void STh::setTarget(QString target) {
 void STh::setPorts(QString ports) {
 	this->ports = ports;
 }
-void STh::run() 
+void STh::run()
 {
-	MainStarter ms;
-	ms.start(this->target.toLocal8Bit().data(),
-		this->ports.toLocal8Bit().data());
+    try {
+        MainStarter ms;
+        ms.start(target.toLocal8Bit().constData(), ports.toLocal8Bit().constData());
+    } catch (const std::exception &error) {
+        globalScanFlag = false;
+        doEmitionRedFoundData(QStringLiteral("Сеанс завершён с ошибкой: ") + QString::fromUtf8(error.what()));
+    } catch (...) {
+        globalScanFlag = false;
+        doEmitionRedFoundData(QStringLiteral("Сеанс завершён с неизвестной ошибкой"));
+    }
 }
-

@@ -132,13 +132,13 @@ lopaStr IPC::IPCBrute(const char *ip, int port, char *SPEC, const std::string *c
     for(int i = 0; i < MaxLogin; ++i)
     {
         if(!globalScanFlag) break;
-		FileUpdater::cv.wait(FileUpdater::lk, [] {return FileUpdater::ready; });
+		FileUpdater::waitForReady();
 		strcpy(login, loginLst[i]);
         if(strcmp(login, " ") == 0) continue;
 
         for(int j = 0; j < MaxPass; ++j)
         {
-            FileUpdater::cv.wait(FileUpdater::lk, []{return FileUpdater::ready;});
+            FileUpdater::waitForReady();
             if(!globalScanFlag) break;
             if(strcmp(passLst[j], " ") == 0) continue;
 			result = 0;

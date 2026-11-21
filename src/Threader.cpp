@@ -1,57 +1,25 @@
 #include "Threader.h"
+#include "externData.h"
+#include <algorithm>
+#include <utility>
+#include <stdexcept>
 
 int Threader::gThreadDelay = 10;
-std::atomic<int> Threader::activeThreads(0);
-std::mutex Threader::m;
-bool Threader::stop = false;
-std::condition_variable Threader::cv;
-std::queue<std::pair<std::string, std::function<void(std::string)>>> Threader::taskQueue;
-std::vector<std::thread> Threader::workers;
+nesca::ThreadPool Threader::pool_;
 
-void Threader::worker() {
-    while (true) {
-        std::pair<std::string, std::function<void(std::string)>> task;
-        {
-            std::unique_lock<std::mutex> lock(m);
-            cv.wait(lock, [] { return stop || !taskQueue.empty(); });
-            if (stop && taskQueue.empty()) return;
-            task = std::move(taskQueue.front());
-            taskQueue.pop();
-        }
-        activeThreads++;
-        task.second(task.first);
-        activeThreads--;
-    }
+void Threader::start() {
+    const int configured = gThreads.load();
+    if (configured <= 0) throw std::invalid_argument("Thread count must be positive");
+    const auto count = static_cast<std::size_t>(configured);
+    pool_.start(count, count);
 }
 
-void Threader::fireThread(std::string ip, void (*func)(std::string)) {
-    {
-        std::lock_guard<std::mutex> lock(m);
-        if (workers.empty()) {
-            stop = false;
-            int numThreads = gThreads;
-            if (numThreads <= 0) numThreads = 1;
-            for (int i = 0; i < numThreads; ++i) {
-                workers.emplace_back(worker);
-            }
-        }
-        taskQueue.push({ip, func});
-    }
-    cv.notify_one();
+bool Threader::fireThread(std::string ip, void (*func)(std::string)) {
+    if (func == nullptr) return false;
+    return pool_.submit([ip = std::move(ip), func] { func(ip); });
 }
 
-void Threader::cleanUp() {
-    {
-        std::lock_guard<std::mutex> lock(m);
-        stop = true;
-        while (!taskQueue.empty()) taskQueue.pop();
-    }
-    cv.notify_all();
-    for (auto& w : workers) {
-        if (w.joinable()) w.join();
-    }
-    workers.clear();
-    activeThreads = 0;
-    stop = false;
-}
-
+void Threader::requestStop() { pool_.requestStop(); }
+void Threader::finish() { pool_.stop(nesca::ThreadPool::StopMode::drain); }
+void Threader::cleanUp() { pool_.stop(); }
+nesca::ThreadPool::Stats Threader::stats() { return pool_.stats(); }

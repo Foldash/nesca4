@@ -12,6 +12,8 @@ on:
       - src/nesca_3.ui
       - src/Utils.h
       - src/BoundedResponse.h
+      - src/ThreadPool.*
+      - src/Threader.*
       - tests/**
       - packaging/**
 

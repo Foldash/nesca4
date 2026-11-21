@@ -21,12 +21,11 @@ public:
     static bool ready;
     static std::condition_variable cv;
     static std::mutex filesUpdatingMutex;
-    static std::unique_lock<std::mutex> lk;
 	static int gNegativeSize;
 	static std::vector<std::string> negativeVector;
 
 public:
-    static void updateLists();
+    static void waitForReady();
     static void loadOnce();
     static void FUClear();
 };

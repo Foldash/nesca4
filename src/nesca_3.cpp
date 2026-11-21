@@ -64,7 +64,7 @@ bool smBit_6 = false;
 bool smBit_7 = false;
 bool smBit_8 = false;
 char gVER[32] = {0};
-int globalPinger = 0;
+std::atomic<int> globalPinger{0};
 int nesca_3::savedTabIndex = 0;
 
 bool startFlag = false;
@@ -91,7 +91,7 @@ DrawerTh_VoiceScanner *vsTh = new DrawerTh_VoiceScanner();
 PieStat *psTh = new PieStat();
 
 bool MapWidgetOpened = false;
-bool globalScanFlag;
+std::atomic<bool> globalScanFlag{false};
 float QoSStep = 1;
 QGraphicsScene *sceneGrid;
 QGraphicsScene *sceneGrid2;
@@ -954,8 +954,8 @@ void nesca_3::slotUpdatePie()
 	float perc5 = 0;
 	float perc6 = ((float)PieSSH/(float)(found) * 100) * degree;
 
-	QString dataSaved = "Saved:\t"	+ QString::number(goods/(float)(found > 0 ? found : 1) * 100) + "%(" + QString::number(goods) + ")";
-	QString dataParsed = "Filtered:\t"	+ QString::number((found - goods)/(float)(found > 0 ? found : 1) * 100) + "%(" + QString::number(found - goods) + ")";
+	QString dataSaved = "Saved:\t"	+ QString::number(goods/(float)(found > 0 ? found.load() : 1) * 100) + "%(" + QString::number(goods) + ")";
+	QString dataParsed = "Filtered:\t"	+ QString::number((found - goods)/(float)(found > 0 ? found.load() : 1) * 100) + "%(" + QString::number(found - goods) + ")";
 	QString dataOnline = "Online:\t"	+ QString::number(found);
 	QString dataAnom = "Cameras:\t"	+ QString::number(PieCamerasC1 / (float)(goods > 0 ? goods : 1) * 100) + "%";
 	QString dataBA = "Auth:\t"	+ QString::number(PieBA/(float)(goods > 0 ? goods : 1) * 100) + "%";
@@ -1203,6 +1203,7 @@ bool nesca_3::eventFilter(QObject* obj, QEvent *event)
 		};
 		return false;
 	};
+    return QMainWindow::eventFilter(obj, event);
 }
 
 void nesca_3::slotClearLogs()
@@ -1845,6 +1846,7 @@ void nesca_3::onLinkClicked(QUrl link)
 }
 
 void nesca_3::slotBlockButtons(bool value) {
+    if (!value && stt->isRunning()) return;
 	ui->startScanButton_3->setEnabled(!value);
 	ui->startScanButton_4->setEnabled(!value);
 	ui->importButton->setEnabled(!value);
@@ -1974,7 +1976,6 @@ void nesca_3::ConnectEvrthng()
 	connect ( ui->secretMessageBut_7, SIGNAL( clicked() ), this, SLOT( smReaction() ) );
 	connect ( ui->secretMessageBut_8, SIGNAL( clicked() ), this, SLOT( smReaction() ) );
 	connect ( ui->dataText, SIGNAL( anchorClicked(QUrl) ), this, SLOT( onLinkClicked(QUrl) ) );
-	connect ( ui->checkKeyBut, SIGNAL( clicked() ), this, SLOT( CheckPersKey() ) );
 	connect ( ui->DataflowModeBut, SIGNAL( clicked() ), this, SLOT( slotShowDataflow() ) );
 	connect ( ui->JobModeBut, SIGNAL( clicked() ), this, SLOT( switchToJobMode() ) );
 	connect ( ui->clearLogBut, SIGNAL( clicked() ), this, SLOT( slotClearLogs() ) );
@@ -2002,7 +2003,7 @@ void nesca_3::ConnectEvrthng()
 	connect ( ui->restoreDefaultPorts1, SIGNAL( clicked() ), this, SLOT( slotRestoreDefPorts() ) );
 	connect ( ui->restoreDefaultPorts2, SIGNAL( clicked() ), this, SLOT( slotRestoreDefPorts() ) );
 	connect ( ui->restoreDefaultPorts3, SIGNAL( clicked() ), this, SLOT( slotRestoreDefPorts() ) );
-	connect ( ui->dnsLine, SIGNAL(textChanged(QString)), this, SLOT(DNSLine_ValueChanged(QString)));
+	connect(ui->dnsLine, &QLineEdit::textChanged, this, &nesca_3::DNSLine_ValueChanged);
 
 	connect ( ui->ipLine, SIGNAL(				returnPressed() ), this, SLOT(	startScanButtonClicked() ) );
 	connect ( ui->threadLine, SIGNAL(			returnPressed() ), this, SLOT(	startScanButtonClicked() ) );
@@ -2028,6 +2029,7 @@ void nesca_3::ConnectEvrthng()
 	connect ( stt, SIGNAL(changeGreenFoundData(QString)), this, SLOT(appendOKText(QString)));
 	connect(stt, SIGNAL(foundDataCustom(QString, QString)), this, SLOT(appendTextCustom(QString, QString)));
 	connect ( stt, SIGNAL(killSttThread()), this, SLOT(STTTerminate()));
+    connect(stt, &QThread::finished, this, &nesca_3::STTTerminate, Qt::QueuedConnection);
 
 	connect ( stt, SIGNAL(signalUpdateArc(unsigned long)), this, SLOT(drawVerboseArcs(unsigned long)));
 
@@ -2043,7 +2045,6 @@ void nesca_3::ConnectEvrthng()
 	connect ( dtME2, SIGNAL(sDrawTextPlacers()), this, SLOT(slotDrawTextPlacers()));
 	connect ( dtQoS, SIGNAL(sAddLine()), this, SLOT(slotQoSAddLine()));
 	connect ( dtGridQoS, SIGNAL(sAddLine()), this, SLOT(slotQoSAddGrid()));
-	connect ( dtGridQoS, SIGNAL(sAddDelimLines()), this, SLOT(slotQoSDrawDelimLines()));
 	connect ( vsTh, SIGNAL(sAddLine()), this, SLOT(slotVoiceAddLine()));
 	connect ( vsTh, SIGNAL(sDrawGrid(int)), this, SLOT(slotDrawVoiceGrid(int)));
 	connect ( vsTh, SIGNAL(sDrawTextPlacers()), this, SLOT(slotDrawTextPlacers()));
@@ -2053,7 +2054,6 @@ void nesca_3::ConnectEvrthng()
 	//connect ( irc_nmb, SIGNAL(sBlinkMessage()), this, SLOT(slotBlinkMessage()) );
 
 	//BA TablelistView
-	connect(stt, SIGNAL(signalAddBARow(int&, QString)), this, SLOT(slotAddBARow(int&, QString)));
 	//connect(stt, SIGNAL(signalAddBARow(int &, QString, QString, QString)), this, SLOT(slotAddBARow(int &, QString, QString, QString)));
 	connect(stt, SIGNAL(signalChangeBARow(int, QString, QString)), this, SLOT(slotChangeBARow(int, QString, QString)));
 }
@@ -2378,13 +2378,24 @@ void nesca_3::mouseMoveEvent(QMouseEvent * event)
 
 void nesca_3::exitButtonClicked()
 {
-	STTTerminate();
-	while (MainStarter::savingBackUpFile) Sleep(100);
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-	WSACleanup();
+    closing_ = true;
+    if (stt->isRunning()) {
+        requestSessionStop();
+        return;
+    }
+#if defined(WIN32) || defined(_WIN32)
+    WSACleanup();
 #endif
-	Threader::cleanUp();
-	qApp->quit();
+    qApp->quit();
+}
+
+void nesca_3::closeEvent(QCloseEvent *event)
+{
+    if (closing_ && !stt->isRunning()) event->accept();
+    else {
+        event->ignore();
+        exitButtonClicked();
+    }
 }
 
 void PekoWidget::pekoExitButtonClicked()
@@ -2452,7 +2463,7 @@ void nesca_3::startScanButtonClicked()
 		if(stopFirst == false)
 		{
 			stopFirst = true;
-			globalScanFlag = false;
+			requestSessionStop();
 			ui->startScanButton_3->setStyleSheet(
 				" QPushButton {"
 				"background-color: qlineargradient(spread:none, x1:1, y1:0, x2:1, y2:1, stop:0.681818 rgba(0, 0, 0, 250), stop:1 rgba(255, 255, 255, 130));"
@@ -2467,7 +2478,7 @@ void nesca_3::startScanButtonClicked()
 		}
 		else
 		{
-			globalScanFlag = false;
+			requestSessionStop();
 			ui->startScanButton_3->setStyleSheet(
 				" QPushButton {"
 				"background-color: qlineargradient(spread:none, x1:1, y1:0, x2:1, y2:1, stop:0.681818 rgba(0, 0, 0, 250), stop:1 rgba(255, 255, 255, 130));"
@@ -2509,7 +2520,7 @@ void nesca_3::startScanButtonClickedDNS()
 		if(stopFirst == false)
 		{
 			stopFirst = true;
-			globalScanFlag = false;
+			requestSessionStop();
 			ui->startScanButton_4->setStyleSheet(
 				" #startScanButton_4 {"
 				"background-color: qlineargradient(spread:none, x1:1, y1:0, x2:1, y2:1, stop:0.681818 rgba(0, 0, 0, 250), stop:1 rgba(255, 255, 255, 130));"
@@ -2525,7 +2536,7 @@ void nesca_3::startScanButtonClickedDNS()
 		}
 		else
 		{
-			globalScanFlag = false;
+			requestSessionStop();
 			ui->startScanButton_4->setStyleSheet(
 				" #startScanButton_4 {"
 				"background-color: qlineargradient(spread:none, x1:1, y1:0, x2:1, y2:1, stop:0.681818 rgba(0, 0, 0, 250), stop:1 rgba(255, 255, 255, 130));"
@@ -2574,7 +2585,7 @@ void nesca_3::importAndScan()
 
 		ui->importButton->setText("Подожди…");
 		stt->doEmitionYellowFoundData("Trying to stop. Please, wait...");
-		globalScanFlag = false;
+		requestSessionStop();
 
 		if (stopFirst == false)
 		{
@@ -2611,6 +2622,7 @@ void nesca_3::importAndScan()
 
 void nesca_3::IPScanSeq()
 {
+    if (closing_ || stt->isRunning()) return;
 	if (ui->ipLine->text() != "")
 	{
 		if (ui->ipmPortLine->text() != "")
@@ -2630,7 +2642,8 @@ void nesca_3::IPScanSeq()
 				(ui->ipLine->text().indexOf("/") < 0 ? ui->ipLine->text() + "-" + ui->ipLine->text() : ui->ipLine->text())
 				));
 			stt->setPorts(ui->ipmPortLine->text().replace(" ", ""));
-			stt->start();
+			setSessionInputsEnabled(false);
+            stt->start();
 
 			startFlag = true;
 			ui->startScanButton_3->setText("Остановить");
@@ -2649,6 +2662,7 @@ void nesca_3::IPScanSeq()
 
 void nesca_3::DNSScanSeq()
 {
+    if (closing_ || stt->isRunning()) return;
 	if (ui->dnsLine->text() != "")
 	{
 		if (ui->dnsPortLine->text() != "")
@@ -2675,7 +2689,8 @@ void nesca_3::DNSScanSeq()
 			stt->setMode(1);
 			stt->setTarget(ui->dnsLine->text());
 			stt->setPorts(ui->dnsPortLine->text().replace(" ", ""));
-			stt->start();
+			setSessionInputsEnabled(false);
+            stt->start();
 
 			startFlag = true;
 			ui->startScanButton_4->setText("Остановить");
@@ -2701,6 +2716,7 @@ void nesca_3::DNSScanSeq()
 
 void nesca_3::ImportScanSeq()
 {
+    if (closing_ || stt->isRunning()) return;
 	QString fileName;
 
 	if (importFileName.size() == 0) fileName = QFileDialog::getOpenFileName(this, tr("Open File"),
@@ -2720,7 +2736,8 @@ void nesca_3::ImportScanSeq()
 		stt->setMode(-1);
 		stt->setTarget(fileName);
 		stt->setPorts(ui->importPortLine->text().replace(" ", ""));
-		stt->start();
+		setSessionInputsEnabled(false);
+            stt->start();
 
 		startFlag = true;
 		ui->importButton->setText("Остановить");
@@ -2784,7 +2801,6 @@ void nesca_3::appendErrText(QString str)
 	{
 		startFlag = false;
 		ui->startScanButton_3->setText("Начать");
-		stt->terminate();
 	};
 }
 
@@ -3070,6 +3086,12 @@ nesca_3::nesca_3(bool isWM, QWidget *parent = 0) : QMainWindow(parent)
 	ui->newMessageLabel->setStyleSheet("color:rgba(255, 0, 0, 0);background-color: rgba(2, 2, 2, 0);");
 	
 	RestoreSession();
+    ui->checkKeyBut->setEnabled(false);
+    ui->checkKeyBut->setToolTip(QStringLiteral("Старая внешняя база не подключена в NESCA 4"));
+    ui->trackerOnOff->setChecked(false);
+    trackerOK = false;
+    ui->trackerOnOff->setEnabled(false);
+    ui->trackerOnOff->setToolTip(QStringLiteral("Старая внешняя база не подключена в NESCA 4"));
 
 	Utils::saveStartDate();
 	Utils::saveStartTime();
@@ -3081,7 +3103,7 @@ nesca_3::nesca_3(bool isWM, QWidget *parent = 0) : QMainWindow(parent)
 	ui->currentDirectoryLine->setText(path);
     for (auto *line : {ui->ipmPortLine, ui->dnsPortLine, ui->importPortLine}) line->setCursorPosition(0);
 	
-	BAModel = new QStandardItemModel();
+	BAModel = new QStandardItemModel(this);
     ui->BATableView->setModel(BAModel);
     connect(ui->outputTabs, &QTabWidget::currentChanged, this, [](int index) {
         BALogSwitched = (index == 1);
@@ -3190,21 +3212,42 @@ nesca_3::~nesca_3()
 	delete ui;
 }
 
-void nesca_3::STTTerminate()
+void nesca_3::setSessionInputsEnabled(bool enabled)
 {
-	globalScanFlag = false;
-	startFlag = false;
-	importFileName = "";
-	ui->tabMainWidget->setTabEnabled(0, true);
-	ui->tabMainWidget->setTabEnabled(1, true);
-	ui->tabMainWidget->setTabEnabled(2, true);
-	ui->tabMainWidget->setTabEnabled(3, true);
-	BrutingThrds = 0;
-	setButtonStyleArea();
-	stt->doEmitionUpdateArc(0);
-	ui->startScanButton_3->setText("Начать");
-	ui->startScanButton_4->setText("Начать");
-	ui->importButton->setText("Выбрать файл и начать");
-	Threader::cleanUp();
+    for (auto *line : ui->tabMainWidget->findChildren<QLineEdit *>()) line->setEnabled(enabled);
+    for (auto *box : ui->tabMainWidget->findChildren<QCheckBox *>()) box->setEnabled(enabled);
+    for (auto *button : {ui->restoreDefaultPorts1, ui->restoreDefaultPorts2, ui->restoreDefaultPorts3, ui->checkKeyBut})
+        button->setEnabled(enabled);
+    // The legacy external database is not part of the current application.
+    ui->trackerOnOff->setEnabled(false);
+    ui->checkKeyBut->setEnabled(false);
 }
 
+void nesca_3::requestSessionStop()
+{
+    globalScanFlag = false;
+    stt->requestInterruption();
+    Threader::requestStop();
+    slotBlockButtons(true);
+}
+
+void nesca_3::STTTerminate()
+{
+    if (stt->isRunning()) {
+        requestSessionStop();
+        return;
+    }
+    globalScanFlag = false;
+    startFlag = false;
+    importFileName.clear();
+    for (int i = 0; i < ui->tabMainWidget->count(); ++i) ui->tabMainWidget->setTabEnabled(i, true);
+    BrutingThrds = 0;
+    setSessionInputsEnabled(true);
+    slotBlockButtons(false);
+    setButtonStyleArea();
+    stt->doEmitionUpdateArc(0);
+    ui->startScanButton_3->setText(QStringLiteral("Начать"));
+    ui->startScanButton_4->setText(QStringLiteral("Начать"));
+    ui->importButton->setText(QStringLiteral("Выбрать файл и начать"));
+    if (closing_) exitButtonClicked();
+}

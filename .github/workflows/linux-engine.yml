@@ -1,0 +1,42 @@
+name: Linux engineering build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/linux-engine.yml
+      - CMakeLists.txt
+      - src/**
+      - tools/**
+      - tests/**
+  pull_request:
+    paths:
+      - .github/workflows/linux-engine.yml
+      - CMakeLists.txt
+      - src/**
+      - tools/**
+      - tests/**
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ qtbase5-dev libssh-dev libcurl4-openssl-dev libssl-dev
+      - name: Build complete engineering target
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DNESCA_BUILD_LEGACY=ON -DCURL_LIBRARY=/usr/lib/x86_64-linux-gnu/libcurl.so
+          cmake --build build --parallel 2
+      - name: Test with synthetic tasks and invalid input only
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build --output-on-failure

@@ -26,17 +26,17 @@ const char headerIVMS[32] = {
 };
 
 const char headerRVI[32] = {
-	0xa0, 0x00, 0x00, 0x60, 0x00, 0x00, 0x00, 0x00,
+	static_cast<char>(0xa0), 0x00, 0x00, 0x60, 0x00, 0x00, 0x00, 0x00,
 	0x61, 0x64, 0x6d, 0x69, 0x6e, 0x00, 0x00, 0x00,
 	0x61, 0x64, 0x6d, 0x69, 0x6e, 0x00, 0x00, 0x00,
-	0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0xa1, 0xaa
+	0x04, 0x01, 0x00, 0x00, 0x00, 0x00, static_cast<char>(0xa1), static_cast<char>(0xaa)
 };
 
 const char loginRVIHeaderStart[8] = {
-	0xa0, 0x00, 0x00, 0x60, 0x00, 0x00, 0x00, 0x00
+	static_cast<char>(0xa0), 0x00, 0x00, 0x60, 0x00, 0x00, 0x00, 0x00
 };
 const char loginRVIHeaderEnd[8] = {
-	0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0xa1, 0xaa
+	0x04, 0x01, 0x00, 0x00, 0x00, 0x00, static_cast<char>(0xa1), static_cast<char>(0xaa)
 };
 
 
@@ -362,10 +362,10 @@ lopaStr HikVis::hikLogin(const char * sDVRIP, int wDVRPort)
 	char pass[32] = { 0 };
 
 	for (int i = 0; i < MaxLogin; ++i) {
-		FileUpdater::cv.wait(FileUpdater::lk, [] {return FileUpdater::ready; });
+		FileUpdater::waitForReady();
 		strcpy(login, loginLst[i]);
 		for (int j = 0; j < MaxPass; ++j) {
-			FileUpdater::cv.wait(FileUpdater::lk, []{return FileUpdater::ready; });
+			FileUpdater::waitForReady();
 			if (!globalScanFlag) return lps;
 			strcpy(pass, passLst[j]);
 
@@ -458,10 +458,10 @@ lopaStr HikVis::rviLogin(const char * sDVRIP, int wDVRPort)
 	char pass[32] = { 0 };
 
 	for (int i = 0; i < MaxLogin; ++i) {
-		FileUpdater::cv.wait(FileUpdater::lk, [] {return FileUpdater::ready; });
+		FileUpdater::waitForReady();
 		strcpy(login, loginLst[i]);
 		for (int j = 0; j < MaxPass; ++j) {
-			FileUpdater::cv.wait(FileUpdater::lk, []{return FileUpdater::ready; });
+			FileUpdater::waitForReady();
 			if (!globalScanFlag) return lps;
 			strcpy(pass, passLst[j]);
 

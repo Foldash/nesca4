@@ -1,4 +1,4 @@
-﻿#ifndef nesca_3_H
+#ifndef nesca_3_H
 #define nesca_3_H
 
 //Include windows.h ONLY *after* qdatetime.h
@@ -57,6 +57,7 @@ public:
 protected:
 	bool eventFilter(QObject* obj, QEvent *event);
 	void run();
+    void closeEvent(QCloseEvent *event) override;
 	
 	QString GetSSLContent(QString str);
 	void SSLConnect(QString str);
@@ -132,6 +133,9 @@ protected:
 
 private:
 	QPoint dragPosition;
+    bool closing_ = false;
+    void requestSessionStop();
+    void setSessionInputsEnabled(bool enabled);
 };
 class PieStatView : public QGraphicsView
 {
