@@ -45,6 +45,10 @@ getline с другими правилами комментариев. Числ�
 - Linux: полная сборка и CTest 9/9. Отдельный разборщик прошёл ASan/UBSan;
   detect_leaks=0 из-за ограничений среды, проверка утечек LSan не выполнялась.
 
+GitHub Actions: [Linux 9/9](https://github.com/Foldash/nesca4/actions/runs/44901408365)
+и [Windows 6/6 + portable startup](https://github.com/Foldash/nesca4/actions/runs/44901408434)
+успешны для исходного коммита `8674e71cd78d6ad33066ddddee03a19f059591c2`.
+
 Сетевой сеанс не запускался. Старый IPRandomizer, разбор ответов, общие данные
 GUI и счётчики прогресса требуют отдельного аудита. Полное приложение Windows
 на этом этапе не собиралось; Windows workflow проверяет UI и чистые модули.
