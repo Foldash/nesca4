@@ -1,0 +1,110 @@
+name: Windows UI preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/windows-preview.yml
+      - CMakeLists.txt
+      - tools/**
+      - src/ModernTheme.h
+      - src/nesca_3.ui
+      - src/Utils.h
+      - src/BoundedResponse.h
+      - tests/**
+      - packaging/**
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install Qt 5.15.2
+        uses: jurplel/install-qt-action@b344308e4483fc892e0d27b3cd1b173ebdd95f06 # v4
+        with:
+          version: 5.15.2
+          arch: win64_msvc2019_64
+          archives: qtbase
+          cache: true
+
+      - name: Build and run regression tests
+        run: |
+          cmake -S . -B build -A x64
+          if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
+          cmake --build build --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+          ctest --test-dir build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw 'Regression tests failed' }
+
+      - name: Create portable directory
+        run: |
+          $package = Join-Path $env:GITHUB_WORKSPACE 'dist/NESCA4-UI-Windows-x64'
+          New-Item -ItemType Directory -Force $package | Out-Null
+          Copy-Item build/Release/nesca4-ui.exe $package
+          & "$env:QT_ROOT_DIR/bin/windeployqt.exe" --release --no-translations --no-compiler-runtime "$package/nesca4-ui.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Qt deployment failed' }
+          # Ship the redistributable DLLs beside the application, without an installer.
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $visualStudio = & $vswhere -latest -products '*' -property installationPath
+          if (-not $visualStudio) { throw 'Visual Studio installation not found' }
+          $redist = Get-ChildItem "$visualStudio/VC/Redist/MSVC" -Directory |
+            Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' } |
+            Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+          if (-not $redist) { throw 'MSVC redistributable directory not found' }
+          $runtime = Join-Path $redist.FullName 'x64/Microsoft.VC143.CRT'
+          if (-not (Test-Path $runtime)) { throw 'MSVC x64 CRT not found' }
+          Copy-Item "$runtime/*.dll" $package
+          Copy-Item packaging/README-Windows.txt "$package/README.txt"
+          Copy-Item THIRD_PARTY.md $package
+          Copy-Item -Recurse packaging/licenses "$package/licenses"
+          Copy-Item packaging/Qt-SOURCES.txt $package
+          "[Paths]`nPlugins=.`n" | Set-Content "$package/qt.conf" -Encoding ascii
+          foreach ($required in @('nesca4-ui.exe', 'Qt5Core.dll', 'Qt5Gui.dll', 'Qt5Widgets.dll', 'platforms/qwindows.dll', 'vcruntime140.dll', 'msvcp140.dll')) {
+            if (-not (Test-Path (Join-Path $package $required))) { throw "Missing package file: $required" }
+          }
+          Compress-Archive -Path $package -DestinationPath dist/NESCA4-UI-Windows-x64.zip
+
+      - name: Test extracted package without installed Qt on PATH
+        run: |
+          $destination = Join-Path $env:RUNNER_TEMP 'NESCA4 portable проверка'
+          Expand-Archive dist/NESCA4-UI-Windows-x64.zip $destination
+          $package = Join-Path $destination 'NESCA4-UI-Windows-x64'
+          $env:PATH = "$env:SystemRoot/System32;$env:SystemRoot"
+          Remove-Item Env:QT_PLUGIN_PATH -ErrorAction SilentlyContinue
+          Remove-Item Env:QT_QPA_PLATFORM_PLUGIN_PATH -ErrorAction SilentlyContinue
+          $env:QT_QPA_PLATFORM = 'windows'
+          $screenshot = Join-Path $env:GITHUB_WORKSPACE 'dist/Windows-preview.png'
+          $process = Start-Process -FilePath "$package/nesca4-ui.exe" -ArgumentList @('--smoke', '--screenshot', $screenshot) -WorkingDirectory $package -PassThru
+          if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Portable UI test timed out' }
+          if ($process.ExitCode -ne 0) { throw "Portable UI test failed: $($process.ExitCode)" }
+          if (-not (Test-Path $screenshot)) { throw 'Portable UI screenshot was not created' }
+          $hash = (Get-FileHash dist/NESCA4-UI-Windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  NESCA4-UI-Windows-x64.zip" | Set-Content dist/SHA256SUMS.txt -Encoding ascii
+
+      - name: Preserve build outputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: NESCA4-UI-Windows-x64
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Publish preview release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = 'ui-preview-${{ github.run_number }}'
+          gh release create $tag dist/NESCA4-UI-Windows-x64.zip dist/SHA256SUMS.txt dist/Windows-preview.png --target "$env:GITHUB_SHA" --prerelease --title 'NESCA 4 — предпросмотр интерфейса для Windows x64' --notes-file packaging/RELEASE_NOTES.md
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }

@@ -1,0 +1,19 @@
+Qt 5.15.2
+
+This package contains unmodified, dynamically linked Qt libraries.
+Qt is used under the GNU Lesser General Public License version 3.
+The license text and the GPL version 3 text it incorporates are in licenses/.
+
+Corresponding Qt source code for version 5.15.2:
+https://download.qt.io/archive/qt/5.15/5.15.2/single/qt-everywhere-src-5.15.2.tar.xz
+https://code.qt.io/cgit/qt/qtbase.git/tag/?h=v5.15.2
+
+Application source code and CMake build instructions:
+https://github.com/Foldash/nesca4
+
+You may replace the Qt shared libraries with compatible modified versions.
+The Qt libraries have not been statically linked into nesca4-ui.exe.
+
+The Microsoft Visual C++ runtime DLLs in this archive are redistributable
+components of the Microsoft Visual Studio build environment. Their license
+is separate from the Qt and application source licenses.
