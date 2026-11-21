@@ -87,14 +87,18 @@ jobs:
           Remove-Item Env:QT_QPA_PLATFORM_PLUGIN_PATH -ErrorAction SilentlyContinue
           $env:QT_QPA_PLATFORM = 'windows'
           $screenshot = Join-Path $env:GITHUB_WORKSPACE 'dist/Windows-preview.png'
-          $process = Start-Process -FilePath "$package/nesca4-ui.exe" -ArgumentList @('--smoke', '--screenshot', $screenshot) -WorkingDirectory $package -PassThru
+          $process = Start-Process -FilePath "$package/nesca4-ui.exe" -ArgumentList @('--screenshot', $screenshot) -WorkingDirectory $package -RedirectStandardOutput "$env:GITHUB_WORKSPACE/dist/portable.stdout.log" -RedirectStandardError "$env:GITHUB_WORKSPACE/dist/portable.stderr.log" -PassThru
           if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Portable UI test timed out' }
-          if ($process.ExitCode -ne 0) { throw "Portable UI test failed: $($process.ExitCode)" }
+          if ($process.ExitCode -ne 0) {
+            Get-Content "$env:GITHUB_WORKSPACE/dist/portable.*.log"
+            throw "Portable UI test failed: $($process.ExitCode)"
+          }
           if (-not (Test-Path $screenshot)) { throw 'Portable UI screenshot was not created' }
           $hash = (Get-FileHash dist/NESCA4-UI-Windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  NESCA4-UI-Windows-x64.zip" | Set-Content dist/SHA256SUMS.txt -Encoding ascii
 
       - name: Preserve build outputs
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: NESCA4-UI-Windows-x64
@@ -102,6 +106,7 @@ jobs:
             dist/*.zip
             dist/*.txt
             dist/*.png
+            dist/*.log
           if-no-files-found: error
 
       - name: Publish preview release
