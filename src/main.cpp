@@ -10,6 +10,8 @@
 #include <qpixmap.h>
 #include "Utils.h"
 #include "externData.h"
+#include "MainStarter.h"
+#include <QTemporaryDir>
 
 int main(int argc, char *argv[])
 {
@@ -82,6 +84,38 @@ int main(int argc, char *argv[])
 		//	Utils::emitScaryError();
 		//}
 		gui->showNormal();
+        if (a.arguments().contains(QStringLiteral("--import-check"))) {
+            QTimer::singleShot(0, gui.get(), [&] {
+                QTemporaryDir directory;
+                const QString name = directory.path() + QStringLiteral("/диапазоны с пробелом.txt");
+                auto write = [&](const QByteArray& content) {
+                    QFile file(name);
+                    return file.open(QIODevice::WriteOnly) && file.write(content) == content.size();
+                };
+                if (!directory.isValid() || !write("# test\r\n192.0.2.0/30\r\n192.0.2.8-192.0.2.9\n")) {
+                    checkResult = 1;
+                } else {
+                    MainStarter loader;
+                    const auto path = name.toUtf8();
+                    auto expect = [&](bool condition) { if (!condition) checkResult = 1; };
+                    expect(loader.fileLoader(path.constData()) == 0);
+                    expect(MainStarter::flCounter == 2 && gTargets == 6);
+                    expect(write("192.0.2.1\ninvalid\n"));
+                    expect(loader.fileLoader(path.constData()) == -1);
+                    expect(MainStarter::flCounter == 2 && gTargets == 6);
+                    expect(write("255.255.255.255/32\n"));
+                    expect(loader.fileLoader(path.constData()) == 0);
+                    expect(MainStarter::flCounter == 1 && gTargets == 1);
+                    expect(loader.fileLoader(directory.path().toUtf8().constData()) == -1);
+                    expect(loader.fileLoader((name + ".missing").toUtf8().constData()) == -1);
+                    expect(write("# empty\n"));
+                    expect(loader.fileLoader(path.constData()) == -1);
+                }
+                std::cout << "Legacy import validation: " << (checkResult ? "FAILED" : "OK")
+                          << ", no session started\n";
+                gui->close();
+            });
+        }
         if (a.arguments().contains(QStringLiteral("--ui-check")))
             QTimer::singleShot(100, gui.get(), &QWidget::close);
         if (a.arguments().contains(QStringLiteral("--session-check"))) {

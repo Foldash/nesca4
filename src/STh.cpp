@@ -86,7 +86,7 @@ void STh::run()
 {
     try {
         MainStarter ms;
-        ms.start(target.toLocal8Bit().constData(), ports.toLocal8Bit().constData());
+        ms.start(target.toUtf8().constData(), ports.toLocal8Bit().constData());
     } catch (const std::exception &error) {
         globalScanFlag = false;
         doEmitionRedFoundData(QStringLiteral("Сеанс завершён с ошибкой: ") + QString::fromUtf8(error.what()));

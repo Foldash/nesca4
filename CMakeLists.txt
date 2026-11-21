@@ -11,7 +11,7 @@ find_package(Threads REQUIRED)
 
 option(NESCA_BUILD_LEGACY "Build the legacy application for engineering validation" OFF)
 
-add_library(nesca4-runtime STATIC src/ThreadPool.cpp src/ThreadPool.h)
+add_library(nesca4-runtime STATIC src/ThreadPool.cpp src/ThreadPool.h src/TargetList.cpp src/TargetList.h)
 target_include_directories(nesca4-runtime PUBLIC src)
 target_link_libraries(nesca4-runtime PUBLIC Threads::Threads)
 
@@ -33,7 +33,8 @@ if(NESCA_BUILD_LEGACY)
         message(FATAL_ERROR "The legacy engineering build requires libssh development files")
     endif()
     file(GLOB LEGACY_SOURCES CONFIGURE_DEPENDS src/*.cpp src/*.h)
-    list(REMOVE_ITEM LEGACY_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/ThreadPool.cpp")
+    list(REMOVE_ITEM LEGACY_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/ThreadPool.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/TargetList.cpp")
     add_executable(nesca4-legacy ${LEGACY_SOURCES} src/nesca_3.ui)
     set_target_properties(nesca4-legacy PROPERTIES AUTOMOC ON)
     target_include_directories(nesca4-legacy PRIVATE src "${LIBSSH_INCLUDE_DIR}")
@@ -52,6 +53,10 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(target-list-regression tests/target_list_regression.cpp)
+    target_link_libraries(target-list-regression PRIVATE nesca4-runtime)
+    add_test(NAME target-list-regression COMMAND target-list-regression)
+    set_tests_properties(target-list-regression PROPERTIES TIMEOUT 10)
     add_test(NAME ui-smoke COMMAND nesca4-ui --smoke)
     set_tests_properties(ui-smoke PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     add_executable(utils-regression tests/utils_regression.cpp)
@@ -67,7 +72,8 @@ if(BUILD_TESTING)
         file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/legacy-check")
         add_test(NAME legacy-ui-check COMMAND nesca4-legacy --ui-check)
         add_test(NAME legacy-session-check COMMAND nesca4-legacy --session-check)
-        set_tests_properties(legacy-ui-check legacy-session-check PROPERTIES
+        add_test(NAME legacy-import-check COMMAND nesca4-legacy --import-check)
+        set_tests_properties(legacy-ui-check legacy-session-check legacy-import-check PROPERTIES
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/legacy-check" TIMEOUT 10)
     endif()

@@ -39,6 +39,7 @@ SOURCES +=\
     BasicAuth.cpp \
     FTPAuth.cpp \
     Threader.cpp \
+    TargetList.cpp \
     ThreadPool.cpp \
     SSHAuth.cpp \
     FileUpdater.cpp \
@@ -77,6 +78,7 @@ HEADERS  += nesca_3.h \
     BruteUtils.h \
     FTPAuth.h \
     Threader.h \
+    TargetList.h \
     ThreadPool.h \
     SSHAuth.h \
     FileUpdater.h \

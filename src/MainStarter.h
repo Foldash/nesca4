@@ -2,6 +2,7 @@
 #define MAINSTARTER_H
 
 #include <ctime>
+#include "TargetList.h"
 #include <string>
 #include <qjsonobject.h>
 #include <qjsonvalue.h>
@@ -18,10 +19,10 @@
 #include "HikvisionLogin.h"
 
 class MainStarter {
-private: char dnsTarget[256];
-		 int ipsstart[4], ipsend[4];
-		 static unsigned int **ipsstartfl, **ipsendfl;
-		 unsigned long ip1, ip2;
+private: char dnsTarget[256] = {};
+		 int ipsstart[4] = {}, ipsend[4] = {};
+		 static std::vector<std::array<unsigned int, 4>> ipsstartfl, ipsendfl;
+		 std::uint64_t ip1 = 0, ip2 = 0;
 		 static int gflIndex;
 
 private:
@@ -109,18 +110,8 @@ public:
 			delete[] sshlpLst;
 			sshlpLst = NULL;
 		};
-		if (ipsstartfl != NULL)
-		{
-			for (int i = 0; i < flCounter; ++i) delete[] ipsstartfl[i];
-			delete[] ipsstartfl;
-			ipsstartfl = NULL;
-		};
-		if (ipsendfl != NULL)
-		{
-			for (int i = 0; i < flCounter; ++i) delete[] ipsendfl[i];
-			delete[] ipsendfl;
-			ipsendfl = NULL;
-		};
+		ipsstartfl.clear();
+		ipsendfl.clear();
 
 		unBlockButtons();
 	}
